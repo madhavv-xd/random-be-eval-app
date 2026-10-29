@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --color-bg: #0d0c0e;
+  --color-card: #161417;
+  --color-raised: #201d21;
+  --color-line: #2c282b;
+  --color-fg: #f5efe8;
+  --color-muted: #a1978f;
+  --color-coral: #ff6a4d;
+  --color-amber: #ffb547;
+
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+
+  /* Story progress bar: the CSS animation drives auto-advance via onAnimationEnd. */
+  --animate-fill: fill 5s linear forwards;
+  @keyframes fill {
+    from { width: 0; }
+    to { width: 100%; }
+  }
+
+  /* State feedback: a liked heart pops once. */
+  --animate-pop: pop 320ms var(--ease-out-quart);
+  @keyframes pop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+  }
+
+  /* Toasts rise in from below. */
+  --animate-toast: toast-in 260ms var(--ease-out-quart);
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  }
+}
+
+:root { color-scheme: dark; }
+body { @apply bg-bg font-sans text-fg antialiased; }
+h1, h2, h3 { text-wrap: balance; }
+p { text-wrap: pretty; }
+
+/* One focus ring for every link and control that doesn't define its own. */
+:where(a, button, summary, [role="tab"], input[type="checkbox"]):focus-visible {
+  outline: 2px solid var(--color-coral);
+  outline-offset: 2px;
+}
+
+/* Native <dialog> opens with a short fade + lift; the backdrop fades in. */
+dialog[open] { animation: dialog-in 220ms var(--ease-out-quart); }
+dialog[open]::backdrop { animation: backdrop-in 220ms ease-out; }
+@keyframes dialog-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } }
+@keyframes backdrop-in { from { opacity: 0; } }
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold
+      transition duration-150 ease-(--ease-out-quart) active:scale-[0.97]
+      focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-primary { @apply bg-coral text-bg hover:bg-coral/85; }
+  .btn-ghost { @apply border border-line bg-raised text-fg hover:border-muted/40 hover:bg-line; }
+  /* 44px touch targets on touch screens, 40px with a mouse. */
+  .icon-btn {
+    @apply relative grid size-11 place-items-center rounded-xl text-muted transition duration-150 hover:bg-raised hover:text-fg
+      active:scale-[0.94] focus-visible:outline-2 focus-visible:outline-coral pointer-fine:size-10;
+  }
+  .input {
+    @apply w-full rounded-xl border border-line bg-raised px-3.5 py-2.5 text-sm outline-none transition duration-150
+      placeholder:text-muted hover:border-muted/40 focus:border-coral/60 focus:ring-2 focus:ring-coral/20;
+  }
+  .card { @apply rounded-3xl border border-line bg-card; }
+  .no-scrollbar { scrollbar-width: none; }
+}
+
+/* Reduced motion: drop decorative movement. The story progress bar keeps running
+   because it's a timer, not decoration, and auto-advance depends on it. */
+@media (prefers-reduced-motion: reduce) {
+  *:not(.animate-fill), *::before, *::after, dialog[open]::backdrop {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .btn:active, .icon-btn:active { transform: none; }
+}

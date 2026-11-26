@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { Highlight, Story, StoryView, User, followingIds } from '../models.js';
-import { fileUrl, httpError, str, upload } from '../lib.js';
+import { httpError, str, upload } from '../lib.js';
+import { storeFiles } from '../media.js';
 import { canSeeContent } from '../access.js';
 import { sendMessage } from './messages.js';
 
@@ -34,7 +35,8 @@ router.get('/stories', async (req, res) => {
 
 router.post('/stories', upload('media', ['image']), async (req, res) => {
   if (!req.files?.[0]) throw httpError(400, 'Please attach an image');
-  const story = await Story.create({ authorId: req.userId, mediaUrl: fileUrl(req.files[0]) });
+  const [mediaUrl] = await storeFiles(req.files.slice(0, 1));
+  const story = await Story.create({ authorId: req.userId, mediaUrl });
   res.status(201).json({ story });
 });
 

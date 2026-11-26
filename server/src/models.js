@@ -35,19 +35,27 @@ const blockSchema = new Schema({ blockerId: ref('User'), blockedId: ref('User', 
 pairIndex(blockSchema, 'blockerId', 'blockedId');
 export const Block = model('Block', blockSchema);
 
-export const Post = model('Post', new Schema({
-  authorId: ref('User', { index: true }),
+// Indexes are chosen per query (see README → "Indexes"):
+//   feed:      { authorId: { $in } } sort { createdAt: -1, _id: -1 }  → { authorId, createdAt, _id }
+//   explore:   sort { createdAt: -1, _id: -1 }                          → { createdAt, _id }
+//   tag page:  { tags } sort { createdAt: -1, _id: -1 }                 → { tags, createdAt, _id }
+const postSchema = new Schema({
+  authorId: ref('User'),
   caption: { type: String, default: '', maxlength: 2200 },
   mediaUrl: { type: String, required: true }, // cover (first item)
   mediaType: { type: String, enum: ['image', 'video'], required: true },
   extraMedia: { type: [String], default: [] }, // more images for carousel posts
   location: { type: String, default: '', maxlength: 60 },
-  tags: { type: [String], index: true },
+  tags: { type: [String] },
   likeCount: { type: Number, default: 0 },
   commentCount: { type: Number, default: 0 },
   editedAt: Date,
-  createdAt: { type: Date, default: Date.now, index: true },
-}));
+  createdAt: { type: Date, default: Date.now },
+});
+postSchema.index({ authorId: 1, createdAt: -1, _id: -1 });
+postSchema.index({ createdAt: -1, _id: -1 });
+postSchema.index({ tags: 1, createdAt: -1, _id: -1 });
+export const Post = model('Post', postSchema);
 
 const likeSchema = new Schema({ postId: ref('Post'), userId: ref('User') });
 pairIndex(likeSchema, 'postId', 'userId');
@@ -57,25 +65,30 @@ const saveSchema = new Schema({ postId: ref('Post'), userId: ref('User') });
 pairIndex(saveSchema, 'postId', 'userId');
 export const Save = model('Save', saveSchema);
 
-export const Comment = model('Comment', new Schema({
-  postId: ref('Post', { index: true }),
+const commentSchema = new Schema({
+  postId: ref('Post'),
   userId: ref('User'),
   parentId: { type: Schema.Types.ObjectId, ref: 'Comment', default: null }, // replies are one level deep
   body: { type: String, required: true, trim: true, maxlength: 500 },
   likeCount: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now },
-}));
+});
+commentSchema.index({ postId: 1, createdAt: 1 }); // a post's comments, oldest first
+commentSchema.index({ parentId: 1 }, { partialFilterExpression: { parentId: { $type: 'objectId' } } }); // replies, on delete
+export const Comment = model('Comment', commentSchema);
 
 const commentLikeSchema = new Schema({ commentId: ref('Comment'), userId: ref('User') });
 pairIndex(commentLikeSchema, 'commentId', 'userId');
 export const CommentLike = model('CommentLike', commentLikeSchema);
 
 // TTL index: MongoDB deletes each story ~24h after createdAt.
-export const Story = model('Story', new Schema({
+const storySchema = new Schema({
   authorId: ref('User'),
   mediaUrl: { type: String, required: true },
   createdAt: { type: Date, default: Date.now, expires: '24h' },
-}));
+});
+storySchema.index({ authorId: 1, createdAt: 1 });
+export const Story = model('Story', storySchema);
 
 const storyViewSchema = new Schema({ storyId: ref('Story'), viewerId: ref('User'), createdAt: { type: Date, default: Date.now, expires: '24h' } });
 pairIndex(storyViewSchema, 'storyId', 'viewerId');
@@ -99,16 +112,18 @@ export const Conversation = model('Conversation', new Schema({
   readAt: { type: Map, of: Date, default: {} },
 }, { timestamps: true }));
 
-export const Message = model('Message', new Schema({
-  conversationId: ref('Conversation', { index: true }),
+const messageSchema = new Schema({
+  conversationId: ref('Conversation'),
   senderId: ref('User'),
   body: { type: String, required: true, trim: true, maxlength: 1000 },
   storyMediaUrl: String, // set when the message is a reply to a story
   createdAt: { type: Date, default: Date.now },
-}));
+});
+messageSchema.index({ conversationId: 1, createdAt: -1 }); // latest 30, then "load older"
+export const Message = model('Message', messageSchema);
 
-export const Notification = model('Notification', new Schema({
-  userId: ref('User', { index: true }),
+const notificationSchema = new Schema({
+  userId: ref('User'),
   type: {
     type: String,
     required: true,
@@ -118,7 +133,10 @@ export const Notification = model('Notification', new Schema({
   postId: { type: Schema.Types.ObjectId, ref: 'Post' },
   isRead: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
-}));
+});
+notificationSchema.index({ userId: 1, createdAt: -1, _id: -1 }); // the paginated list
+notificationSchema.index({ userId: 1, isRead: 1 }); // the unread badge count
+export const Notification = model('Notification', notificationSchema);
 
 const reportSchema = new Schema({
   reporterId: ref('User'),

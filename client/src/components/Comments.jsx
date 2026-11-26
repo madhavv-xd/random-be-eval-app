@@ -133,7 +133,7 @@ function CommentRow({ comment: c, small, postAuthorId, onReply, setComments, onC
           <span>{timeAgo(c.createdAt)}</span>
           {c.likeCount > 0 && <span>{c.likeCount} {c.likeCount === 1 ? 'like' : 'likes'}</span>}
           <button onClick={() => onReply(c)} className="hover:text-fg">Reply</button>
-          {canDelete && <button onClick={remove} className="hover:text-red-300">Delete</button>}
+          {canDelete && <button onClick={remove} className="hover:text-danger">Delete</button>}
         </div>
       </div>
       <button onClick={like} aria-pressed={c.likedByMe} aria-label={c.likedByMe ? 'Unlike comment' : 'Like comment'} className={`self-start pt-1 ${c.likedByMe ? 'text-coral' : 'text-muted hover:text-fg'}`}>

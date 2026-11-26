@@ -70,7 +70,7 @@ export default function Create() {
 
   return (
     <form onSubmit={submit} className="card mx-auto max-w-xl p-5 sm:p-6">
-      <h1 className="text-xl font-bold">New post</h1>
+      <h1 className="text-2xl font-extrabold tracking-tight">New post</h1>
       <p className="mt-1 text-sm text-muted">Up to {MAX_PHOTOS} photos, or one short video (it also shows up in Reels). Use #tags and @mentions in the caption.</p>
 
       {files.length > 0 ? (

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ImageOff, RotateCw, WifiOff } from 'lucide-react';
+import { media, srcSet } from '../api';
 
 export function PostSkeleton() {
   return (
@@ -73,27 +74,40 @@ export function RichText({ text }) {
   });
 }
 
-// <img> that shows a placeholder instead of a broken-image icon.
-export function SafeImg({ src, alt = '', className = '', ...props }) {
+// <img> that resolves API/CDN URLs, serves responsive sizes (`sizes` tells the browser how wide it's shown),
+// and shows a placeholder instead of a broken-image icon.
+export function SafeImg({ src, alt = '', className = '', width = 960, sizes = '(max-width: 640px) 100vw, 600px', ...props }) {
   const [failed, setFailed] = useState(false);
   if (failed) {
     return <div className={`grid place-items-center bg-raised text-muted ${className}`} role="img" aria-label={alt || 'Image unavailable'}><ImageOff size={24} /></div>;
   }
-  return <img src={src} alt={alt} onError={() => setFailed(true)} className={className} {...props} />;
+  const set = srcSet(src);
+  return <img src={media(src, width)} srcSet={set} sizes={set ? sizes : undefined} alt={alt} decoding="async"
+    onError={() => setFailed(true)} className={className} {...props} />;
 }
 
-// Dropdown built on native <details>; closes on item click or outside click.
-export function Menu({ label, icon, children, className = '' }) {
+// <video> with the API/CDN URL resolved.
+export const Video = ({ src, ...props }) => <video src={media(src)} {...props} />;
+
+// Dropdown built on native <details>; closes on item click, outside click or Escape.
+// `up` opens it above the trigger (for menus at the bottom of the screen); `trigger` replaces the icon button's style.
+export function Menu({ label, icon, children, className = '', up = false, align = 'right', trigger = 'icon-btn' }) {
   const ref = useRef(null);
   useEffect(() => {
     const close = (e) => ref.current && !ref.current.contains(e.target) && (ref.current.open = false);
+    const esc = (e) => e.key === 'Escape' && ref.current?.open && (ref.current.open = false);
     document.addEventListener('click', close);
-    return () => document.removeEventListener('click', close);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('click', close);
+      document.removeEventListener('keydown', esc);
+    };
   }, []);
   return (
     <details ref={ref} className={`relative ${className}`}>
-      <summary className="icon-btn cursor-pointer list-none [&::-webkit-details-marker]:hidden" aria-label={label} title={label}>{icon}</summary>
-      <div onClick={() => (ref.current.open = false)} className="absolute right-0 z-20 mt-1 w-52 rounded-2xl border border-line bg-card p-1.5 shadow-xl shadow-black/40">
+      <summary className={`${trigger} cursor-pointer list-none [&::-webkit-details-marker]:hidden`} aria-label={label} title={label}>{icon}</summary>
+      <div onClick={() => (ref.current.open = false)}
+        className={`absolute z-50 w-56 origin-top rounded-2xl border border-line bg-card p-1.5 shadow-xl shadow-shade ${up ? 'bottom-full mb-2' : 'mt-1'} ${align === 'right' ? 'right-0' : 'left-0'}`}>
         {children}
       </div>
     </details>
@@ -102,7 +116,7 @@ export function Menu({ label, icon, children, className = '' }) {
 
 export function MenuItem({ icon: Icon, children, danger, ...props }) {
   return (
-    <button {...props} className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm hover:bg-raised ${danger ? 'text-red-300' : ''}`}>
+    <button {...props} className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm hover:bg-raised ${danger ? 'text-danger' : ''}`}>
       <Icon size={16} /> {children}
     </button>
   );

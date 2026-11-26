@@ -10,11 +10,11 @@ import { AUTHOR } from './posts.js';
 const router = Router();
 
 // A changed follow makes the follower's cached "who I follow" and "For you" lists stale.
-const invalidateFeed = (userId) => invalidate(`following:${userId}`, `ranked:${userId}`);
+const invalidateFeed = (userId) => invalidate(`following:${userId}`, `ranked:${userId}`, `feed:${userId}`);
 
 async function follow(followerId, followingId) {
   await Follow.create({ followerId, followingId });
-  invalidateFeed(followerId);
+  await invalidateFeed(followerId);
   await User.updateOne({ _id: followerId }, { $inc: { followingCount: 1 } });
   await User.updateOne({ _id: followingId }, { $inc: { followerCount: 1 } });
 }
@@ -22,7 +22,7 @@ async function follow(followerId, followingId) {
 // Returns true if there was a follow to remove.
 async function unfollow(followerId, followingId) {
   if (!(await Follow.findOneAndDelete({ followerId, followingId }))) return false;
-  invalidateFeed(followerId);
+  await invalidateFeed(followerId);
   await User.updateOne({ _id: followerId }, { $inc: { followingCount: -1 } });
   await User.updateOne({ _id: followingId }, { $inc: { followerCount: -1 } });
   return true;
@@ -68,14 +68,17 @@ router.get('/follow-requests', async (req, res) => {
   res.json({ requests });
 });
 
-router.post('/follow-requests/:id/:action', async (req, res) => {
+// POST /follow-requests/:id/accept|decline, and PATCH for the same thing (REST-style).
+async function respondToRequest(req, res) {
   if (!['accept', 'decline'].includes(req.params.action)) throw httpError(404, 'Not found');
   const request = await FollowRequest.findOne({ _id: req.params.id, toId: req.userId });
   if (!request) throw httpError(404, 'Request not found');
   if (req.params.action === 'accept') await acceptRequest(request);
   else await request.deleteOne();
   res.json({ ok: true });
-});
+}
+router.post('/follow-requests/:id/:action', respondToRequest);
+router.patch('/follow-requests/:id/:action', respondToRequest);
 
 // Followers / following lists. Private accounts only show them to followers.
 for (const [path, match, field] of [['followers', 'followingId', 'followerId'], ['following', 'followerId', 'followingId']]) {

@@ -56,7 +56,7 @@ export function Confirm({ title, text, confirmLabel = 'Confirm', danger = true, 
         {text && <p className="mt-2 text-sm text-muted">{text}</p>}
         <div className="mt-6 grid grid-cols-2 gap-2">
           <button onClick={onClose} className="btn btn-ghost">Cancel</button>
-          <button onClick={confirm} disabled={busy} className={`btn ${danger ? 'bg-red-500 text-white hover:bg-red-500/85' : 'btn-primary'}`}>
+          <button onClick={confirm} disabled={busy} className={`btn ${danger ? 'btn-danger' : 'btn-primary'}`}>
             {busy ? 'One sec…' : confirmLabel}
           </button>
         </div>

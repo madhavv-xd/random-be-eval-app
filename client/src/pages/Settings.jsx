@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Camera, Lock, LogOut, ShieldBan, Trash2, UserRound, KeyRound } from 'lucide-react';
+import { Camera, Lock, LogOut, Palette, ShieldBan, Trash2, UserRound, KeyRound } from 'lucide-react';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import { useFetch } from '../hooks';
@@ -7,6 +7,7 @@ import { compressImage } from '../compress';
 import { useToast } from '../toast';
 import Avatar from '../components/Avatar';
 import Modal from '../components/Modal';
+import { ThemeSwitch } from '../components/Layout';
 import { ErrorState, RowSkeleton } from '../components/Ui';
 
 function Section({ icon: Icon, title, text, children }) {
@@ -43,8 +44,11 @@ export default function Settings() {
   const { logout } = useAuth();
   return (
     <div className="mx-auto max-w-xl space-y-5">
-      <h1 className="text-xl font-bold">Settings</h1>
+      <h1 className="text-2xl font-extrabold tracking-tight">Settings</h1>
       <ProfileSection />
+      <Section icon={Palette} title="Appearance" text="System follows your device’s light or dark setting.">
+        <ThemeSwitch className="max-w-sm" />
+      </Section>
       <PrivacySection />
       <BlockedSection />
       <PasswordSection />
@@ -83,7 +87,7 @@ function ProfileSection() {
           <input name="avatar" type="file" accept="image/*" onChange={(e) => setAvatar(e.target.files[0] ?? null)} className="sr-only" />
           <span className="relative">
             <Avatar user={preview ? { avatarUrl: preview } : user} size={72} />
-            <span className="absolute -right-1 -bottom-1 grid size-7 place-items-center rounded-lg bg-coral text-bg ring-4 ring-card"><Camera size={14} /></span>
+            <span className="absolute -right-1 -bottom-1 grid size-7 place-items-center rounded-lg bg-coral text-on-accent ring-4 ring-card"><Camera size={14} /></span>
           </span>
           <span className="text-sm font-semibold text-coral">Change photo</span>
         </label>
@@ -120,7 +124,7 @@ function PrivacySection() {
         {/* Native checkbox styled as a switch: keyboard and screen readers work for free. */}
         <input type="checkbox" role="switch" checked={user.isPrivate} onChange={toggle} disabled={busy}
           className="relative h-7 w-12 shrink-0 cursor-pointer appearance-none rounded-full bg-line transition checked:bg-coral
-            before:absolute before:top-1 before:left-1 before:size-5 before:rounded-full before:bg-fg before:transition checked:before:translate-x-5
+            before:absolute before:top-1 before:left-1 before:size-5 before:rounded-full before:bg-white before:shadow-sm before:shadow-black/30 before:transition checked:before:translate-x-5
             focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral disabled:opacity-60" />
       </label>
     </Section>
@@ -185,10 +189,10 @@ function DeleteSection() {
   }
 
   return (
-    <section className="card border-red-500/30 p-5 sm:p-6">
-      <h2 className="flex items-center gap-2 font-bold text-red-300"><Trash2 size={18} /> Delete account</h2>
+    <section className="card border-danger/30 p-5 sm:p-6">
+      <h2 className="flex items-center gap-2 font-bold text-danger"><Trash2 size={18} /> Delete account</h2>
       <p className="mt-1 text-sm text-muted">Permanently removes your profile, posts, comments, messages and followers. This can’t be undone.</p>
-      <button onClick={() => setOpen(true)} className="btn mt-4 bg-red-500/15 text-red-300 hover:bg-red-500/25">Delete my account</button>
+      <button onClick={() => setOpen(true)} className="btn mt-4 bg-danger/12 text-danger hover:bg-danger/20">Delete my account</button>
       {open && (
         <Modal onClose={() => setOpen(false)} className="w-[min(92vw,24rem)]">
           <form onSubmit={submit} className="card p-6">
@@ -197,7 +201,7 @@ function DeleteSection() {
             <input name="password" type="password" required autoFocus autoComplete="current-password" placeholder="Password" aria-label="Password" className="input mt-4" />
             <div className="mt-5 grid grid-cols-2 gap-2">
               <button type="button" onClick={() => setOpen(false)} className="btn btn-ghost">Cancel</button>
-              <button disabled={busy} className="btn bg-red-500 text-white hover:bg-red-500/85">{busy ? 'Deleting…' : 'Delete forever'}</button>
+              <button disabled={busy} className="btn btn-danger">{busy ? 'Deleting…' : 'Delete forever'}</button>
             </div>
           </form>
         </Modal>

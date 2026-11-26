@@ -21,12 +21,12 @@ export default function Home() {
   return (
     <div className="mx-auto grid max-w-5xl gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="mx-auto w-full max-w-xl min-w-0 space-y-6">
+        <h1 className="sr-only">Home feed</h1>
         <Stories />
 
-        <div role="tablist" aria-label="Feed" className="grid grid-cols-2 gap-1 rounded-2xl border border-line bg-card p-1">
+        <div role="tablist" aria-label="Feed" className="seg">
           {FEEDS.map((f) => (
-            <button key={f.id} role="tab" aria-selected={feed.id === f.id} onClick={() => setFeed(f)}
-              className={`btn rounded-xl ${feed.id === f.id ? 'bg-raised text-fg' : 'text-muted hover:text-fg'}`}>
+            <button key={f.id} role="tab" aria-selected={feed.id === f.id} onClick={() => setFeed(f)} className="btn seg-item">
               <f.icon size={16} className={feed.id === f.id ? 'text-coral' : ''} /> {f.label}
             </button>
           ))}

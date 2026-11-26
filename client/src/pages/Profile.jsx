@@ -12,7 +12,7 @@ import PostGrid from '../components/PostGrid';
 import { copyLink } from '../components/PostCard';
 import { StoryViewer } from '../components/Stories';
 import UserList from '../components/UserList';
-import { Empty, ErrorState, GridSkeleton, Menu, MenuItem } from '../components/Ui';
+import { Empty, ErrorState, GridSkeleton, Menu, MenuItem, SafeImg } from '../components/Ui';
 
 // Each profile gets its own warm gradient banner, derived from the username.
 function bannerFor(username) {
@@ -130,7 +130,7 @@ function ProfileView({ username }) {
           <div className="no-scrollbar mt-6 flex gap-4 overflow-x-auto">
             {data.highlights.map((h) => (
               <button key={h._id} onClick={() => setHighlight(h)} className="flex w-20 shrink-0 flex-col items-center gap-1.5">
-                <img src={h.items.at(-1)?.mediaUrl} alt="" className="size-18 rounded-[35%] border-2 border-line object-cover p-0.5" />
+                <SafeImg src={h.items.at(-1)?.mediaUrl} width={160} sizes="72px" className="size-18 rounded-[35%] border-2 border-line object-cover p-0.5" />
                 <span className="w-full truncate text-center text-xs font-medium">{h.title}</span>
               </button>
             ))}
@@ -147,7 +147,7 @@ function ProfileView({ username }) {
           <div role="tablist" className="mx-4 mt-8 flex gap-2 sm:mx-8">
             {tabs.map(([id, label, Icon]) => (
               <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
-                className={`btn rounded-full ${tab === id ? 'bg-fg text-bg' : 'text-muted hover:bg-raised hover:text-fg'}`}>
+                className="btn chip">
                 <Icon size={16} /> {label}
               </button>
             ))}

@@ -31,8 +31,8 @@ export function ToastProvider({ children }) {
         {toasts.map(({ id, message, type }) => {
           const Icon = ICONS[type];
           return (
-            <div key={id} role={type === 'error' ? 'alert' : 'status'} className="flex max-w-sm animate-toast items-center gap-2.5 rounded-2xl border border-line bg-raised px-4 py-3 text-sm text-fg shadow-lg shadow-black/40">
-              <Icon size={18} className={`shrink-0 ${type === 'error' ? 'text-red-400' : 'text-coral'}`} />
+            <div key={id} role={type === 'error' ? 'alert' : 'status'} className="flex max-w-sm animate-toast items-center gap-2.5 rounded-2xl border border-line bg-raised px-4 py-3 text-sm text-fg shadow-lg shadow-shade">
+              <Icon size={18} className={`shrink-0 ${type === 'error' ? 'text-danger' : 'text-coral'}`} />
               {message}
             </div>
           );

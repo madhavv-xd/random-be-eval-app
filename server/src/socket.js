@@ -3,11 +3,22 @@ import jwt from 'jsonwebtoken';
 import { JWT_SECRET } from './lib.js';
 import { Conversation, Notification } from './models.js';
 import { isBlocked } from './access.js';
+import { redis } from './cache.js';
 
 let io;
+let adapterSub; // the Redis subscriber connection used by the adapter
 
-export function initSocket(server) {
-  io = new Server(server);
+export function initSocket(server, cors) {
+  io = new Server(server, { cors });
+  // With REDIS_URL, events are published through Redis, so a user connected to instance A
+  // still gets a notification triggered by a request that hit instance B.
+  if (redis) {
+    import('@socket.io/redis-adapter').then(({ createAdapter }) => {
+      adapterSub = redis.duplicate();
+      io.adapter(createAdapter(redis, adapterSub));
+      console.log('Socket.io: Redis adapter enabled');
+    });
+  }
   // Same JWT as the REST API, sent in the handshake: io({ auth: { token } }).
   io.use((socket, next) => {
     try {
@@ -28,6 +39,12 @@ export function initSocket(server) {
       if (other) emitTo([other], 'typing', { conversationId, userId: socket.userId });
     });
   });
+}
+
+// Used by tests and graceful shutdown.
+export async function closeSocket() {
+  await new Promise((resolve) => (io ? io.close(() => resolve()) : resolve())); // adapter unsubscribes here
+  await adapterSub?.quit().catch(() => {});
 }
 
 export function emitTo(userIds, event, payload) {

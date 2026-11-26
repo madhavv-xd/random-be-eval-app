@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 export async function connectDB() {
   let uri = process.env.MONGO_URI;
   if (!uri) {
+    if (process.env.NODE_ENV === 'production') throw new Error('MONGO_URI must be set in production');
     const { MongoMemoryServer } = await import('mongodb-memory-server');
     uri = (await MongoMemoryServer.create()).getUri();
     console.log('MONGO_URI not set: using in-memory MongoDB (data resets on restart)');

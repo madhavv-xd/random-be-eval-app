@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { Hash, ImageOff, Lock, Search, TrendingUp, UserX } from 'lucide-react';
 import { useFetch, usePaged } from '../hooks';
 import Avatar from '../components/Avatar';
@@ -13,27 +13,35 @@ export default function Explore() {
   const [params, setParams] = useSearchParams();
   const q = params.get('q') ?? '';
   const type = params.get('type') ?? 'user';
+  const input = useRef(null);
+  const location = useLocation();
+  // Arriving via the "/" shortcut focuses the search box.
+  useEffect(() => { if (location.state?.focusSearch) input.current?.focus(); }, [location.state]);
   const setSearch = (next) => setParams(Object.fromEntries(Object.entries({ q, type, ...next }).filter(([, v]) => v)), { replace: true });
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
+      <h1 className="sr-only">Search and explore</h1>
       <div className="relative">
         <Search size={18} className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-muted" />
         <input
+          ref={input}
+          type="search"
           value={q}
           onChange={(e) => setSearch({ q: e.target.value })}
           className="input rounded-2xl py-3.5 pl-11 text-base"
           placeholder="Search people, posts, places or #tags"
           aria-label="Search"
         />
+        <kbd className="pointer-events-none absolute top-1/2 right-4 hidden -translate-y-1/2 rounded-md border border-line px-1.5 text-xs text-muted md:block">/</kbd>
       </div>
 
       {q.trim() ? (
         <>
-          <div role="tablist" className="flex gap-2">
+          <div role="tablist" aria-label="Search in" className="flex gap-2">
             {TYPES.map(([id, label]) => (
               <button key={id} role="tab" aria-selected={type === id} onClick={() => setSearch({ type: id })}
-                className={`btn rounded-full ${type === id ? 'bg-fg text-bg' : 'text-muted hover:bg-raised hover:text-fg'}`}>
+                className="btn chip">
                 {label}
               </button>
             ))}

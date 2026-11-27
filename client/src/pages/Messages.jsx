@@ -7,13 +7,13 @@ import { useFetch } from '../hooks';
 import { useToast } from '../toast';
 import Avatar from '../components/Avatar';
 import { Sheet } from '../components/Modal';
-import { Empty, ErrorState, RowSkeleton } from '../components/Ui';
+import { Empty, ErrorState, RowSkeleton, SafeImg } from '../components/Ui';
 
 // Two panes on desktop (inbox + chat); on mobile the inbox and the chat are separate screens.
 export default function Messages() {
   const { id } = useParams();
   return (
-    <div className="card mx-auto grid h-[calc(100dvh-11rem)] max-w-5xl overflow-hidden md:h-[calc(100dvh-8rem)] md:grid-cols-[320px_minmax(0,1fr)]">
+    <div className="card mx-auto grid h-[calc(100dvh-10rem)] max-w-5xl overflow-hidden md:h-[calc(100dvh-5rem)] md:grid-cols-[320px_minmax(0,1fr)]">
       <Inbox activeId={id} className={id ? 'hidden md:flex' : 'flex'} />
       {id ? <Thread key={id} id={id} /> : (
         <div className="hidden place-items-center md:grid">
@@ -63,7 +63,7 @@ function Inbox({ activeId, className }) {
                   {mine && 'You: '}{c.lastMessage?.body} · {timeAgo(c.lastMessage?.createdAt)}
                 </p>
               </div>
-              {unread > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-coral px-1.5 text-[11px] font-bold text-bg">{unread}</span>}
+              {unread > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-coral px-1.5 text-[11px] font-bold text-on-accent">{unread}</span>}
             </Link>
           );
         })}
@@ -234,11 +234,11 @@ function Thread({ id }) {
             <div key={m._id}>
               {gap && <p className="py-2 text-center text-[11px] font-medium text-muted">{new Date(m.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</p>}
               <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-                <div title={new Date(m.createdAt).toLocaleTimeString()} className={`max-w-[75%] rounded-3xl px-4 py-2 text-sm break-words ${mine ? 'rounded-br-lg bg-coral text-bg' : 'rounded-bl-lg bg-raised'}`}>
+                <div title={new Date(m.createdAt).toLocaleTimeString()} className={`max-w-[75%] rounded-3xl px-4 py-2 text-sm break-words ${mine ? 'rounded-br-lg bg-coral text-on-accent' : 'rounded-bl-lg bg-raised'}`}>
                   {m.storyMediaUrl && (
                     <div className="mb-2">
-                      <p className={`mb-1 text-[11px] ${mine ? 'text-bg/70' : 'text-muted'}`}>{mine ? 'You replied to their story' : 'Replied to your story'}</p>
-                      <img src={m.storyMediaUrl} alt="Story" className="h-32 w-20 rounded-xl object-cover" />
+                      <p className={`mb-1 text-[11px] ${mine ? 'text-on-accent/75' : 'text-muted'}`}>{mine ? 'You replied to their story' : 'Replied to your story'}</p>
+                      <SafeImg src={m.storyMediaUrl} width={240} sizes="80px" alt="Story" className="h-32 w-20 rounded-xl object-cover" />
                     </div>
                   )}
                   {m.body}

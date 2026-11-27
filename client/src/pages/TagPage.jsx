@@ -11,7 +11,7 @@ export default function TagPage() {
   return (
     <div className="mx-auto max-w-4xl">
       <header className="mb-6 flex items-center gap-4">
-        <span className="grid size-16 place-items-center rounded-3xl bg-linear-to-br from-coral to-amber text-bg"><Hash size={30} strokeWidth={2.5} /></span>
+        <span className="grid size-16 place-items-center rounded-3xl bg-linear-to-br from-coral to-amber text-on-accent"><Hash size={30} strokeWidth={2.5} /></span>
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">#{tag}</h1>
           <p className="text-sm text-muted">{done ? `${posts.length} ${posts.length === 1 ? 'post' : 'posts'}` : 'Recent posts'}</p>

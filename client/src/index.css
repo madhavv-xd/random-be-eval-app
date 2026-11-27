@@ -2,14 +2,22 @@
 
 @theme {
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-  --color-bg: #0d0c0e;
-  --color-card: #161417;
-  --color-raised: #201d21;
+
+  /* Dark is the default palette; [data-theme="light"] below swaps the same tokens.
+     Every color in the app comes from these, so both themes stay in sync. */
+  --color-bg: #0d0c0e;        /* page */
+  --color-sidebar: #110f12;   /* navigation chrome, a step off the page */
+  --color-card: #161417;      /* content surfaces */
+  --color-raised: #201d21;    /* inputs, hovers, chips */
   --color-line: #2c282b;
   --color-fg: #f5efe8;
   --color-muted: #a1978f;
-  --color-coral: #ff6a4d;
-  --color-amber: #ffb547;
+  --color-coral: #ff6a4d;     /* the one accent: actions, active, unread */
+  --color-on-accent: #170c09; /* text/icons sitting on coral or amber */
+  --color-amber: #ffb547;     /* saved items and @mentions */
+  --color-danger: #f87171;
+  --color-on-danger: #1a0b0b;
+  --color-shade: rgb(0 0 0 / 0.45); /* shadows */
 
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
 
@@ -36,7 +44,28 @@
 }
 
 :root { color-scheme: dark; }
+
+/* Light theme: same roles, re-tuned. Coral and amber get darker so text in them
+   still passes 4.5:1 on white; coral buttons switch to white text for the same reason. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-bg: oklch(0.983 0.002 50);
+  --color-sidebar: oklch(0.966 0.003 50);
+  --color-card: #ffffff;
+  --color-raised: oklch(0.945 0.006 40);
+  --color-line: oklch(0.9 0.008 40);
+  --color-fg: oklch(0.2 0.012 40);
+  --color-muted: oklch(0.47 0.014 40);
+  --color-coral: oklch(0.585 0.2 33);
+  --color-on-accent: #ffffff;
+  --color-amber: oklch(0.56 0.13 62);
+  --color-danger: oklch(0.55 0.2 25);
+  --color-on-danger: #ffffff;
+  --color-shade: rgb(40 25 20 / 0.12);
+}
 body { @apply bg-bg font-sans text-fg antialiased; }
+/* Theme switches cross-fade instead of snapping. Only while switching (class set by theme.js). */
+.theme-fade, .theme-fade * { transition: background-color 200ms ease-out, border-color 200ms ease-out, color 200ms ease-out !important; }
 h1, h2, h3 { text-wrap: balance; }
 p { text-wrap: pretty; }
 
@@ -58,7 +87,8 @@ dialog[open]::backdrop { animation: backdrop-in 220ms ease-out; }
       transition duration-150 ease-(--ease-out-quart) active:scale-[0.97]
       focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral disabled:pointer-events-none disabled:opacity-50;
   }
-  .btn-primary { @apply bg-coral text-bg hover:bg-coral/85; }
+  .btn-primary { @apply bg-coral text-on-accent hover:bg-coral/85; }
+  .btn-danger { @apply bg-danger text-on-danger hover:bg-danger/85; }
   .btn-ghost { @apply border border-line bg-raised text-fg hover:border-muted/40 hover:bg-line; }
   /* 44px touch targets on touch screens, 40px with a mouse. */
   .icon-btn {
@@ -70,6 +100,12 @@ dialog[open]::backdrop { animation: backdrop-in 220ms ease-out; }
       placeholder:text-muted hover:border-muted/40 focus:border-coral/60 focus:ring-2 focus:ring-coral/20;
   }
   .card { @apply rounded-3xl border border-line bg-card; }
+  /* Segmented control (`btn seg-item`) and filter chips (`btn chip`): one look for every tablist. */
+  .seg { @apply flex gap-1 rounded-2xl border border-line bg-card p-1; }
+  .seg-item { @apply flex-1 rounded-xl text-muted hover:text-fg; }
+  .seg-item[aria-selected="true"] { @apply bg-raised text-fg shadow-sm shadow-shade; }
+  .chip { @apply rounded-full text-muted hover:bg-raised hover:text-fg; }
+  .chip[aria-selected="true"] { @apply bg-fg text-bg hover:bg-fg hover:text-bg; }
   .no-scrollbar { scrollbar-width: none; }
 }
 

@@ -8,7 +8,7 @@ import { compressImage } from '../compress';
 import { useToast } from '../toast';
 import Avatar from './Avatar';
 import Modal, { Confirm, Sheet } from './Modal';
-import { RowSkeleton } from './Ui';
+import { RowSkeleton, SafeImg } from './Ui';
 
 export default function Stories() {
   const { user } = useAuth();
@@ -58,7 +58,7 @@ export default function Stories() {
         <input type="file" accept="image/*" onChange={upload} disabled={uploading} className="sr-only" />
         <div className="relative">
           <Avatar user={user} size={48} />
-          <span className="absolute -right-1.5 -bottom-1.5 grid size-6 place-items-center rounded-lg bg-coral text-bg ring-4 ring-card"><Plus size={14} strokeWidth={3} /></span>
+          <span className="absolute -right-1.5 -bottom-1.5 grid size-6 place-items-center rounded-lg bg-coral text-on-accent ring-4 ring-card"><Plus size={14} strokeWidth={3} /></span>
         </div>
         <span className="text-xs font-semibold">{uploading ? 'Uploading…' : 'Add story'}</span>
       </label>
@@ -68,10 +68,10 @@ export default function Stories() {
       {groups?.map((g) => (
         <button key={g.author._id} onClick={() => setViewing(flat.findIndex((s) => s.author._id === g.author._id && (!s.viewed || g.allViewed)))}
           className={`group relative h-44 w-28 shrink-0 overflow-hidden rounded-2xl border-2 text-left focus-visible:outline-2 focus-visible:outline-coral ${g.allViewed ? 'border-line opacity-70' : 'border-coral'}`}>
-          <img src={g.stories.at(-1).mediaUrl} alt="" className="absolute inset-0 size-full object-cover transition duration-300 group-hover:scale-105" />
+          <SafeImg src={g.stories.at(-1).mediaUrl} width={320} sizes="112px" className="absolute inset-0 size-full object-cover transition duration-300 group-hover:scale-105" />
           <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/10 to-transparent" />
           <Avatar user={g.author} size={34} className={`absolute top-2.5 left-2.5 ring-2 ${g.allViewed ? 'ring-line' : 'ring-coral'}`} />
-          <span className="absolute inset-x-2.5 bottom-2.5 truncate text-xs font-semibold">
+          <span className="absolute inset-x-2.5 bottom-2.5 truncate text-xs font-semibold text-white">
             {g.author._id === user._id ? 'Your story' : g.author.name.split(' ')[0]}
           </span>
         </button>
@@ -121,8 +121,8 @@ export function StoryViewer({ stories, start, onClose, onSeen, mode = 'story', o
 
   return (
     <Modal onClose={onClose} className="h-dvh max-h-none w-full max-w-none sm:h-[88vh] sm:w-auto">
-      <div className="relative h-full overflow-hidden bg-black sm:aspect-[9/16] sm:rounded-3xl">
-        <img src={story.mediaUrl} alt="" className="size-full object-cover" />
+      <div className="relative h-full overflow-hidden bg-black text-white sm:aspect-[9/16] sm:rounded-3xl">
+        <SafeImg src={story.mediaUrl} width={1280} sizes="(max-width: 640px) 100vw, 420px" className="size-full object-cover" />
         <div className="absolute inset-x-0 top-0 h-28 bg-linear-to-b from-black/70 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 h-32 bg-linear-to-t from-black/70 to-transparent" />
 
@@ -221,7 +221,7 @@ function HighlightSheet({ storyId, onClose }) {
         {data?.highlights.map((h) => (
           <button key={h._id} onClick={() => save(api(`/highlights/${h._id}/items`, { method: 'POST', body: { storyId } }))}
             className="mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left hover:bg-raised">
-            <img src={h.items.at(-1)?.mediaUrl} alt="" className="size-10 rounded-xl object-cover" />
+            <SafeImg src={h.items.at(-1)?.mediaUrl} width={120} sizes="40px" className="size-10 rounded-xl object-cover" />
             <span className="text-sm font-semibold">{h.title}</span>
             <span className="ml-auto text-xs text-muted">{h.items.length}</span>
           </button>

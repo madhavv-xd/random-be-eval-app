@@ -6,6 +6,8 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import { server } from '../src/app.js';
 import { Post } from '../src/models.js';
 import { parseMentions, parseTags } from '../src/lib.js';
+import { clearCache, redis } from '../src/cache.js';
+import { closeSocket } from '../src/socket.js';
 
 let mongo, base;
 
@@ -17,7 +19,9 @@ before(async () => {
 });
 
 after(async () => {
-  server.close();
+  await clearCache();
+  await closeSocket(); // also closes the HTTP server
+  await redis?.quit(); // when run with REDIS_URL
   await mongoose.disconnect();
   await mongo.stop();
 });
@@ -131,4 +135,52 @@ test('ranked feed, search and live caching', async () => {
 
   assert.equal((await call('/search?type=post&q=lisbon', { token: e.token })).posts.length, 1);
   assert.deepEqual((await call('/search?type=hashtag&q=%23beach', { token: e.token })).tags, [{ tag: 'beachday', count: 1 }]);
+});
+
+test('cursor never skips posts created in the same millisecond', async () => {
+  const g = await register('gina');
+  const same = new Date();
+  // 15 posts sharing one timestamp: a createdAt-only cursor would lose some at the page edge.
+  await Post.insertMany(Array.from({ length: 15 }, (_, i) => ({ authorId: g.user._id, mediaUrl: `/t${i}.jpg`, mediaType: 'image', createdAt: same })));
+  const seen = new Set();
+  let cursor = '';
+  for (let pages = 0; cursor !== null && pages < 10; pages++) {
+    const res = await call(`/feed?limit=4${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, { token: g.token });
+    res.posts.forEach((p) => seen.add(p._id));
+    cursor = res.nextCursor;
+  }
+  assert.equal(seen.size, 15);
+  assert.equal((await call('/feed?cursor=nonsense', { token: g.token })).status, 400);
+});
+
+test('cached first feed page is invalidated when someone you follow posts', async () => {
+  const h = await register('hana');
+  const i = await register('ivan');
+  await call(`/users/${i.user._id}/follow`, { token: h.token, method: 'POST' });
+  assert.equal((await call('/feed', { token: h.token })).posts.length, 0); // now cached as empty
+
+  const form = new FormData();
+  form.append('caption', 'fresh #news');
+  form.append('media', new Blob([Uint8Array.from([0xff, 0xd8, 0xff])], { type: 'image/jpeg' }), 'a.jpg');
+  const res = await fetch(`${base}/posts`, { method: 'POST', headers: { Authorization: `Bearer ${i.token}` }, body: form });
+  assert.equal(res.status, 201);
+  const { post } = await res.json();
+
+  const feed = await call('/feed', { token: h.token });
+  assert.equal(feed.posts[0]?._id, post._id, 'the new post shows up despite the cache');
+  assert.equal((await call(`/posts/${post._id}`, { token: i.token, method: 'DELETE' })).ok, true);
+  assert.equal((await call('/feed', { token: h.token })).posts.length, 0, 'and disappears when deleted');
+});
+
+test('health check and REST-style follow request accept', async () => {
+  const health = await fetch(base.replace('/api', '/api/health')).then((r) => r.json());
+  assert.equal(health.ok, true);
+
+  const j = await register('jade');
+  const k = await register('kofi');
+  await call('/users/me', { token: k.token, method: 'PATCH', body: { isPrivate: true } });
+  assert.equal((await call(`/users/${k.user._id}/follow`, { token: j.token, method: 'POST' })).status, 'requested');
+  const { requests } = await call('/follow-requests', { token: k.token });
+  assert.equal((await call(`/follow-requests/${requests[0]._id}/accept`, { token: k.token, method: 'PATCH' })).ok, true);
+  assert.equal((await call('/users/kofi', { token: j.token })).followStatus, 'following');
 });

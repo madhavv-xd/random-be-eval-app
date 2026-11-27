@@ -1,9 +1,12 @@
-import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
+import { redis } from './cache.js';
 
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET must be set in production');
+}
 export const JWT_SECRET = process.env.JWT_SECRET || 'pulse-dev-secret';
 export const UPLOADS_DIR = path.resolve(import.meta.dirname, '../uploads');
 
@@ -35,15 +38,51 @@ export async function toggle(Model, doc) {
   return true;
 }
 
-// ponytail: in-memory fixed window per IP; resets on restart and isn't shared between processes.
-// Use express-rate-limit with a Redis store if this ever runs on more than one instance.
+// Fixed-window rate limit for writes (POST/PATCH/DELETE), keyed by user when logged in, else by IP.
+// General writes: 120/min. Spam-prone actions (post, like, follow, comment): 30/min each.
+// With REDIS_URL the counters live in Redis (INCR + PEXPIRE), so every API instance shares them.
 const hits = new Map();
-export function writeLimit(req, res, next) {
-  if (req.method === 'GET') return next();
+async function hit(key, windowMs) {
+  if (redis) {
+    const count = await redis.incr(key);
+    if (count === 1) await redis.pexpire(key, windowMs);
+    return count;
+  }
   const now = Date.now();
-  const entry = hits.get(req.ip);
-  if (!entry || now > entry.resetAt) hits.set(req.ip, { count: 1, resetAt: now + 60_000 });
-  else if (++entry.count > 120) return next(httpError(429, 'Too many requests, slow down a little'));
+  const entry = hits.get(key);
+  if (!entry || now > entry.resetAt) {
+    hits.set(key, { count: 1, resetAt: now + windowMs });
+    return 1;
+  }
+  return ++entry.count;
+}
+
+const STRICT = /^\/(posts(\/[^/]+\/(like|comments))?|users\/[^/]+\/follow)$/;
+const whoIs = (req) => {
+  try {
+    return jwt.verify(req.headers.authorization?.replace('Bearer ', ''), JWT_SECRET).id;
+  } catch {
+    return req.ip;
+  }
+};
+
+export async function writeLimit(req, res, next) {
+  if (req.method === 'GET' || req.method === 'OPTIONS') return next();
+  try {
+    const who = whoIs(req);
+    const minute = 60_000;
+    const strict = STRICT.test(req.path) && req.method === 'POST';
+    const [all, action] = await Promise.all([
+      hit(`rl:${who}`, minute),
+      strict ? hit(`rl:${who}:${req.path.replace(/[0-9a-f]{24}/g, ':id')}`, minute) : 0,
+    ]);
+    if (all > 120 || action > 30) {
+      res.set('Retry-After', '60');
+      return next(httpError(429, 'Too many requests, slow down a little'));
+    }
+  } catch {
+    // Rate limiter unavailable (e.g. Redis blip): let the request through rather than fail it.
+  }
   next();
 }
 
@@ -59,12 +98,6 @@ export const upload = (field, kinds, maxCount = 1) => multer({
     : cb(httpError(400, `Only ${kinds.join(' or ')} files are allowed`)),
 }).array(field, maxCount);
 
-export const fileUrl = (file) => `/uploads/${file.filename}`;
-
-// Deletes local uploads (remote seed URLs are ignored).
-export const removeFiles = (urls) => Promise.all(urls
-  .filter((u) => u?.startsWith('/uploads/'))
-  .map((u) => fs.unlink(path.join(UPLOADS_DIR, path.basename(u))).catch(() => {})));
 
 // Every error leaves the API as { error: "message" }.
 export function errorHandler(err, req, res, next) {

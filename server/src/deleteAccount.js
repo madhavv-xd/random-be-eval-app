@@ -4,7 +4,7 @@ import {
   Block, Comment, CommentLike, Conversation, Follow, FollowRequest, Highlight, Like, Message,
   Notification, Post, Report, Save, Story, StoryView, User,
 } from './models.js';
-import { removeFiles } from './lib.js';
+import { removeFiles } from './media.js';
 import { clearCache } from './cache.js';
 
 // Applies -1 per occurrence: [a, a, b] → a: -2, b: -1.
@@ -65,7 +65,7 @@ export async function deleteAccount(userId) {
     Conversation.deleteMany({ _id: { $in: conversations } }),
     User.deleteOne({ _id: userId }),
   ]);
-  clearCache(); // other users' cached follow lists may include this account
+  await clearCache(); // other users' cached follow lists may include this account
   await removeFiles([...posts.flatMap((p) => [p.mediaUrl, ...p.extraMedia]), ...stories.map((s) => s.mediaUrl),
     ...highlights.flatMap((h) => h.items.map((i) => i.mediaUrl)), user?.avatarUrl]);
 }

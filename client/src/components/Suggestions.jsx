@@ -9,7 +9,7 @@ export default function Suggestions() {
   const { data, error, loading, reload } = useFetch('/users/suggestions');
 
   return (
-    <aside className="card sticky top-24 p-5">
+    <aside className="card sticky top-8 p-5">
       <h2 className="font-bold">Suggested people</h2>
       <p className="mb-3 text-xs text-muted">People you don’t follow yet</p>
       {loading && !data && <RowSkeleton rows={3} />}

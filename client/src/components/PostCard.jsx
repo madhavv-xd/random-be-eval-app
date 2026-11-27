@@ -8,7 +8,7 @@ import Avatar from './Avatar';
 import Comments from './Comments';
 import { Confirm, Sheet } from './Modal';
 import UserList from './UserList';
-import { Menu, MenuItem, RichText, SafeImg } from './Ui';
+import { Menu, MenuItem, RichText, SafeImg, Video } from './Ui';
 
 // Like / save with optimistic UI, shared by PostCard and Reels.
 // The UI flips instantly; the server's answer then sets the real count (or we roll back on error).
@@ -69,7 +69,7 @@ export function Media({ post, className = '' }) {
   const [track, setTrack] = useState(null);
 
   if (post.mediaType === 'video') {
-    return <video src={post.mediaUrl} controls muted loop playsInline preload="metadata" className={`bg-black object-cover ${className}`} />;
+    return <Video src={post.mediaUrl} controls muted loop playsInline preload="metadata" className={`bg-black object-cover ${className}`} />;
   }
   const alt = post.caption || `Post by ${post.authorId.username}`;
   if (urls.length === 1) return <SafeImg src={post.mediaUrl} alt={alt} loading="lazy" className={`bg-raised object-cover ${className}`} />;
@@ -84,7 +84,7 @@ export function Media({ post, className = '' }) {
           <SafeImg key={url} src={url} alt={`${alt} (${i + 1} of ${urls.length})`} loading="lazy" className="size-full shrink-0 snap-center bg-raised object-cover" />
         ))}
       </div>
-      <span className="absolute top-3 right-3 rounded-full bg-black/55 px-2.5 py-1 text-xs font-semibold backdrop-blur">{index + 1}/{urls.length}</span>
+      <span className="absolute top-3 right-3 rounded-full bg-black/55 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur">{index + 1}/{urls.length}</span>
       {index > 0 && <button onClick={() => go(index - 1)} className={`${arrow} left-3`} aria-label="Previous photo"><ChevronLeft size={18} /></button>}
       {index < urls.length - 1 && <button onClick={() => go(index + 1)} className={`${arrow} right-3`} aria-label="Next photo"><ChevronRight size={18} /></button>}
       <div className="absolute inset-x-0 bottom-3 flex justify-center gap-1.5">

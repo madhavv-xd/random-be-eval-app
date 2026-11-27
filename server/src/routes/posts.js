@@ -1,7 +1,8 @@
 import mongoose from 'mongoose';
 import { Router } from 'express';
 import { Comment, CommentLike, Follow, Like, Notification, Post, Report, Save, User, followingIds } from '../models.js';
-import { fileUrl, httpError, parseMentions, parseTags, removeFiles, str, toggle, upload } from '../lib.js';
+import { httpError, parseMentions, parseTags, str, toggle, upload } from '../lib.js';
+import { discardUploads, removeFiles, storeFiles } from '../media.js';
 import { assertCanSeePost, excludedAuthors, hiddenIds, withFollowStatus } from '../access.js';
 import { cached, invalidate } from '../cache.js';
 import { broadcast, notify } from '../socket.js';
@@ -17,7 +18,7 @@ const pageSize = (req) => Math.min(Math.max(parseInt(req.query.limit) || 10, 1),
 // The lookups run after $limit, so the cost is 3 indexed lookups per returned post (at most 20),
 // not per matching post. Likes and saves use their { postId, userId } unique indexes.
 // Note: aggregate() doesn't cast types the way find() does, so `match` must use ObjectIds and Dates.
-export function findPosts(userId, { match, sort = { createdAt: -1 }, limit = 60 }) {
+export function findPosts(userId, { match, sort = { createdAt: -1, _id: -1 }, limit = 60 }) {
   const me = oid(userId);
   const mine = (from, as) => ({
     $lookup: { from, localField: '_id', foreignField: 'postId', as, pipeline: [{ $match: { userId: me } }, { $limit: 1 }, { $project: { _id: 1 } }] },
@@ -35,17 +36,36 @@ export function findPosts(userId, { match, sort = { createdAt: -1 }, limit = 60 
   ]);
 }
 
-// Cursor pagination: cursor = createdAt of the last post you received.
-// ponytail: posts sharing the exact same millisecond can be skipped at a page edge; use (createdAt, _id) as the cursor if that matters.
+// Cursor pagination. The cursor is "<createdAt ISO>_<_id>" of the last post you received.
+// Sorting and filtering on (createdAt, _id) means two posts created in the same millisecond can't be
+// skipped or repeated at a page edge, and each page is an index range scan instead of a skip().
+export const encodeCursor = (post) => `${new Date(post.createdAt).toISOString()}_${post._id}`;
+export function cursorFilter(cursor) {
+  const [iso, id] = String(cursor).split('_');
+  const date = new Date(iso);
+  if (isNaN(date) || (id && !mongoose.isValidObjectId(id))) throw httpError(400, 'Invalid cursor');
+  if (!id) return { createdAt: { $lt: date } }; // plain date cursor (older clients)
+  return { $or: [{ createdAt: { $lt: date } }, { createdAt: date, _id: { $lt: oid(id) } }] };
+}
+
 async function page(req, match) {
   const limit = pageSize(req);
-  if (req.query.cursor) {
-    const cursor = new Date(req.query.cursor);
-    if (isNaN(cursor)) throw httpError(400, 'Invalid cursor');
-    match.createdAt = { $lt: cursor };
-  }
+  if (req.query.cursor) match = { $and: [match, cursorFilter(req.query.cursor)] };
   const posts = await findPosts(req.userId, { match, limit });
-  return { posts, nextCursor: posts.length === limit ? posts.at(-1).createdAt : null };
+  return { posts, nextCursor: posts.length === limit ? encodeCursor(posts.at(-1)) : null };
+}
+
+// Post ids in the order they were given (aggregate + $in returns them in index order).
+async function hydrate(userId, ids) {
+  const order = new Map(ids.map((id, i) => [String(id), i]));
+  const posts = await findPosts(userId, { match: { _id: { $in: ids } }, limit: ids.length || 1 });
+  return posts.sort((a, b) => order.get(String(a._id)) - order.get(String(b._id)));
+}
+
+// Cache keys that go stale when `authorId` posts or deletes: every follower's feeds, and the author's own.
+export async function feedKeysFor(authorId) {
+  const followers = await Follow.find({ followingId: authorId }).distinct('followerId');
+  return [...followers, authorId].flatMap((id) => [`ranked:${id}`, `feed:${id}`]);
 }
 
 // "For you": posts from people I follow (and mine) in the last 14 days, ranked by engagement with a time decay
@@ -92,13 +112,21 @@ router.get('/feed', async (req, res) => {
     const ids = await rankedIds(req.userId);
     const limit = pageSize(req);
     const offset = Math.max(parseInt(req.query.cursor) || 0, 0);
-    const slice = ids.slice(offset, offset + limit);
-    const order = new Map(slice.map((id, i) => [String(id), i]));
-    const posts = (await findPosts(req.userId, { match: { _id: { $in: slice } }, limit }))
-      .sort((a, b) => order.get(String(a._id)) - order.get(String(b._id)));
+    const posts = await hydrate(req.userId, ids.slice(offset, offset + limit));
     return res.json({ posts, nextCursor: offset + limit < ids.length ? String(offset + limit) : null });
   }
-  res.json(await page(req, { authorId: { $in: [...(await followingIds(req.userId)), oid(req.userId)] } }));
+
+  const authors = { authorId: { $in: [...(await followingIds(req.userId)), oid(req.userId)] } };
+  if (req.query.cursor) return res.json(await page(req, authors));
+
+  // First page: the hottest read in the app (every app open, every pull-to-refresh).
+  // The ids of the newest 20 posts are cached for 30s per user and invalidated when anyone they follow posts.
+  // Only ids are cached: counts and "liked by me" are looked up fresh, so they're never stale.
+  const limit = pageSize(req);
+  const ids = await cached(`feed:${req.userId}`, 30_000, async () =>
+    (await Post.find(authors).sort({ createdAt: -1, _id: -1 }).limit(20).select('_id').lean()).map((p) => p._id));
+  const posts = await hydrate(req.userId, ids.slice(0, limit));
+  res.json({ posts, nextCursor: posts.length === limit ? encodeCursor(posts.at(-1)) : null });
 });
 router.get('/explore', async (req, res) => {
   res.json(await page(req, { authorId: { $nin: await excludedAuthors(req.userId) } }));
@@ -132,22 +160,22 @@ router.post('/posts', upload('media', ['image', 'video'], 10), async (req, res) 
   const files = req.files ?? [];
   const hasVideo = files.some((f) => f.mimetype.startsWith('video/'));
   if (!files.length || (hasVideo && files.length > 1)) {
-    await removeFiles(files.map(fileUrl));
+    await discardUploads(files);
     throw httpError(400, files.length ? 'A video post can only contain that one video' : 'Please attach an image or video');
   }
   const caption = str(req.body.caption);
+  const urls = await storeFiles(files);
   const post = await Post.create({
     authorId: req.userId,
     caption,
     location: str(req.body.location).slice(0, 60),
     tags: parseTags(caption),
-    mediaUrl: fileUrl(files[0]),
+    mediaUrl: urls[0],
     mediaType: hasVideo ? 'video' : 'image',
-    extraMedia: files.slice(1).map(fileUrl),
+    extraMedia: urls.slice(1),
   });
-  // My followers' cached "For you" lists are now stale.
-  const followers = await Follow.find({ followingId: req.userId }).distinct('followerId');
-  invalidate(...[...followers, req.userId].map((id) => `ranked:${id}`));
+  // Fan-out of the *invalidation* (not the post): my followers' cached feeds are now stale.
+  await invalidate(...(await feedKeysFor(req.userId)));
   await notifyMentions(caption, req.userId, post._id);
   res.status(201).json({ post: await findOne(post._id, req.userId) });
 });
@@ -178,7 +206,7 @@ router.delete('/posts/:id', async (req, res) => {
     CommentLike.deleteMany({ commentId: { $in: commentIds } }),
     ...[Like, Save, Comment, Notification, Report].map((Model) => Model.deleteMany({ postId })),
   ]);
-  await removeFiles([post.mediaUrl, ...post.extraMedia]);
+  await Promise.all([removeFiles([post.mediaUrl, ...post.extraMedia]), invalidate(...(await feedKeysFor(post.authorId)))]);
   res.json({ ok: true });
 });
 

@@ -1,12 +1,36 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BellOff, CheckCheck, UserPlus } from 'lucide-react';
+import { AtSign, BellOff, CheckCheck, Heart, MessageCircle, UserCheck, UserPlus } from 'lucide-react';
 import { api, timeAgo } from '../api';
 import { NOTIFICATION_TEXT, useAuth } from '../auth';
 import { useFetch, usePaged } from '../hooks';
 import { useToast } from '../toast';
 import Avatar from '../components/Avatar';
-import { Empty, ErrorState, RowSkeleton, SafeImg } from '../components/Ui';
+import { Empty, ErrorState, RowSkeleton, SafeImg, Video } from '../components/Ui';
+
+// Small icon on the avatar says what kind of notification it is, before you read the text.
+const KIND = {
+  like: [Heart, 'bg-coral text-on-accent'],
+  comment_like: [Heart, 'bg-coral text-on-accent'],
+  comment: [MessageCircle, 'bg-fg text-bg'],
+  reply: [MessageCircle, 'bg-fg text-bg'],
+  mention: [AtSign, 'bg-amber text-on-accent'],
+  follow: [UserPlus, 'bg-fg text-bg'],
+  follow_request: [UserPlus, 'bg-amber text-on-accent'],
+  follow_accept: [UserCheck, 'bg-fg text-bg'],
+};
+
+// Today / This week / Earlier, keeping the server's newest-first order.
+function groupByAge(items) {
+  const startOfToday = new Date().setHours(0, 0, 0, 0);
+  const weekAgo = startOfToday - 6 * 86400e3;
+  const groups = [['Today', []], ['This week', []], ['Earlier', []]];
+  for (const n of items) {
+    const t = new Date(n.createdAt).getTime();
+    groups[t >= startOfToday ? 0 : t >= weekAgo ? 1 : 2][1].push(n);
+  }
+  return groups.filter(([, list]) => list.length);
+}
 
 export default function Notifications() {
   const { socket, setUnread } = useAuth();
@@ -41,39 +65,60 @@ export default function Notifications() {
     }
   }
 
-  const hasUnread = items.some((n) => !n.isRead);
-  const open = (n) => navigate(n.postId ? `/p/${n.postId._id}` : `/u/${n.actorId.username}`);
+  const unreadCount = items.filter((n) => !n.isRead).length;
+  function open(n) {
+    if (!n.isRead) {
+      setItems((list) => list.map((x) => (x._id === n._id ? { ...x, isRead: true } : x)));
+      api(`/notifications/${n._id}/read`, { method: 'PATCH' }).then((r) => setUnread(r.unreadCount)).catch(() => {});
+    }
+    navigate(n.postId ? `/p/${n.postId._id}` : `/u/${n.actorId.username}`);
+  }
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Notifications</h1>
-        <button onClick={markAllRead} disabled={!hasUnread} className="btn btn-ghost"><CheckCheck size={16} /> Mark all read</button>
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight">Notifications</h1>
+          <p className="mt-0.5 text-sm text-muted">{unreadCount ? `${unreadCount} new` : 'You’re all caught up'}</p>
+        </div>
+        <button onClick={markAllRead} disabled={!unreadCount} className="btn btn-ghost"><CheckCheck size={16} /> Mark all read</button>
       </div>
 
       {requests.data?.requests.length > 0 && <FollowRequests list={requests.data.requests} onDone={requests.reload} />}
 
       {error && <ErrorState message={error} onRetry={loadMore} />}
       {!loading && !error && items.length === 0 && <Empty icon={BellOff} title="Nothing yet" text="Likes, comments, mentions and new followers show up here in real time." />}
-      {items.length > 0 && (
-        <ul className="card divide-y divide-line overflow-hidden">
-          {items.map((n) => (
-            <li key={n._id}>
-              <button onClick={() => open(n)} className={`flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-raised/60 ${n.isRead ? '' : 'bg-coral/[0.06]'}`}>
-                <span className={`size-2 shrink-0 rounded-full ${n.isRead ? 'bg-transparent' : 'bg-coral'}`} aria-label={n.isRead ? undefined : 'Unread'} />
-                <Avatar user={n.actorId} size={42} />
-                <p className="min-w-0 flex-1 text-sm">
-                  <span className="font-semibold">{n.actorId.username}</span> {NOTIFICATION_TEXT[n.type]}
-                  <span className="ml-1.5 text-xs text-muted">{timeAgo(n.createdAt)}</span>
-                </p>
-                {n.postId && (n.postId.mediaType === 'video'
-                  ? <video src={n.postId.mediaUrl} muted preload="metadata" className="size-11 rounded-xl object-cover" />
-                  : <SafeImg src={n.postId.mediaUrl} className="size-11 rounded-xl object-cover" />)}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      {groupByAge(items).map(([label, list]) => (
+        <section key={label} aria-labelledby={`n-${label}`}>
+          <h2 id={`n-${label}`} className="mb-2 px-1 text-sm font-semibold text-muted">{label}</h2>
+          <ul className="card divide-y divide-line overflow-hidden">
+            {list.map((n) => {
+              const [Icon, tone] = KIND[n.type] ?? KIND.follow;
+              return (
+                <li key={n._id}>
+                  <button onClick={() => open(n)}
+                    className={`flex w-full items-center gap-3.5 px-4 py-3 text-left transition duration-150 hover:bg-raised/60 ${n.isRead ? '' : 'bg-coral/[0.06]'}`}>
+                    <span className="relative shrink-0">
+                      <Avatar user={n.actorId} size={44} />
+                      <span className={`absolute -right-1 -bottom-1 grid size-5 place-items-center rounded-full ring-2 ring-card ${tone}`}>
+                        <Icon size={11} strokeWidth={2.75} fill={Icon === Heart ? 'currentColor' : 'none'} />
+                      </span>
+                    </span>
+                    <p className="min-w-0 flex-1 text-sm leading-snug">
+                      <span className="font-semibold">{n.actorId.username}</span> {NOTIFICATION_TEXT[n.type]}
+                      <span className="mt-0.5 block text-xs text-muted">{timeAgo(n.createdAt)}{timeAgo(n.createdAt) !== 'now' && ' ago'}</span>
+                    </p>
+                    {n.postId && (n.postId.mediaType === 'video'
+                      ? <Video src={n.postId.mediaUrl} muted preload="metadata" className="size-11 shrink-0 rounded-xl object-cover" />
+                      : <SafeImg src={n.postId.mediaUrl} width={120} sizes="44px" className="size-11 shrink-0 rounded-xl object-cover" />)}
+                    {!n.isRead && <span className="size-2 shrink-0 rounded-full bg-coral"><span className="sr-only">Unread</span></span>}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
       {loading && <div className="card px-4 py-2"><RowSkeleton rows={items.length ? 2 : 4} /></div>}
       <div ref={sentinel} />
     </div>

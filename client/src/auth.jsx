@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
-import { api } from './api';
+import { API_URL, api } from './api';
 import { useToast } from './toast';
 
 const AuthContext = createContext(null);
@@ -38,7 +38,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!user?._id) return;
     api('/counts').then((c) => { setUnread(c.notifications); setUnreadMessages(c.messages); }).catch(() => {});
-    const s = io({ auth: { token: localStorage.getItem('token') } });
+    const s = io(API_URL || undefined, { auth: { token: localStorage.getItem('token') } });
     s.on('notification:new', (n) => {
       setUnread((count) => count + 1);
       toast(`${n.actorId.username} ${NOTIFICATION_TEXT[n.type]}`);

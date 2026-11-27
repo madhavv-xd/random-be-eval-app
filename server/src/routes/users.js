@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { Block, FollowRequest, Highlight, Post, User, followingIds } from '../models.js';
-import { fileUrl, httpError, str, upload } from '../lib.js';
+import { httpError, str, upload } from '../lib.js';
+import { removeFiles, storeFiles } from '../media.js';
 import { canSeeContent, excludedAuthors, hiddenIds, withFollowStatus } from '../access.js';
 import { deleteAccount } from '../deleteAccount.js';
 import { findPosts } from './posts.js';
@@ -27,9 +28,11 @@ router.patch('/users/me', upload('avatar', ['image']), async (req, res) => {
     if (update.bio.length > 160) throw httpError(400, 'Bio must be 160 characters or less');
   }
   if (req.body.isPrivate !== undefined) update.isPrivate = req.body.isPrivate === true || req.body.isPrivate === 'true';
-  if (req.files?.[0]) update.avatarUrl = fileUrl(req.files[0]);
+  const old = req.files?.[0] && (await User.findById(req.userId).select('avatarUrl')).avatarUrl;
+  if (req.files?.[0]) [update.avatarUrl] = await storeFiles(req.files.slice(0, 1));
 
   const user = await User.findByIdAndUpdate(req.userId, update, { new: true });
+  if (old) await removeFiles([old]);
   // Going public accepts everyone who was waiting.
   if (update.isPrivate === false) {
     for (const request of await FollowRequest.find({ toId: req.userId })) await acceptRequest(request);

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Clapperboard, Heart, MessageCircle, Send, Volume2, VolumeX } from 'lucide-react';
+import { media } from '../api';
 import { usePaged } from '../hooks';
 import { useToast } from '../toast';
 import { copyLink, usePostActions } from '../components/PostCard';
@@ -19,7 +20,7 @@ export default function Reels() {
 
   return (
     // Scroll-snap does the "one reel per swipe" behaviour; no JS carousel needed.
-    <div className="no-scrollbar mx-auto h-[calc(100dvh-11rem)] max-w-md snap-y snap-mandatory overflow-y-scroll rounded-3xl md:h-[calc(100dvh-8rem)]">
+    <div className="no-scrollbar mx-auto h-[calc(100dvh-10rem)] max-w-md snap-y snap-mandatory overflow-y-scroll rounded-3xl md:h-[calc(100dvh-5rem)]">
       {items.map((post, i) => (
         <Reel key={post._id} post={post} onVisible={i === items.length - 1 ? loadMore : undefined} />
       ))}
@@ -54,8 +55,8 @@ function Reel({ post: initial, onVisible }) {
   const bubble = 'grid size-12 place-items-center rounded-2xl bg-white/10 backdrop-blur-md transition hover:bg-white/20';
 
   return (
-    <section className="relative h-full snap-start snap-always overflow-hidden rounded-3xl bg-black">
-      <video ref={video} src={post.mediaUrl} loop muted={muted} playsInline preload="metadata"
+    <section className="relative h-full snap-start snap-always overflow-hidden rounded-3xl bg-black text-white">
+      <video ref={video} src={media(post.mediaUrl)} loop muted={muted} playsInline preload="metadata"
         onClick={() => setMuted(!muted)} className="size-full cursor-pointer object-cover" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-48 bg-linear-to-t from-black/85 to-transparent" />
 
@@ -64,7 +65,7 @@ function Reel({ post: initial, onVisible }) {
           <Avatar user={author} size={36} className="ring-2 ring-white/20" />
           <span className="font-semibold">{author.username}</span>
         </Link>
-        {post.caption && <p className="mt-2 line-clamp-2 text-sm text-white/90"><RichText text={post.caption} /></p>}
+        {post.caption && <p className="mt-2 line-clamp-2 text-sm text-white/90 [&_a]:text-white [&_a]:underline-offset-2"><RichText text={post.caption} /></p>}
       </div>
 
       <div className="absolute right-3 bottom-5 flex flex-col gap-4">

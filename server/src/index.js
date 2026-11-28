@@ -2,9 +2,10 @@ import './instrument.js'; // must be first: Sentry instruments modules as they l
 import { connectDB } from './db.js';
 import { server } from './app.js';
 import { seed } from './seed.js';
+import { User } from './models.js';
 
 const inMemory = await connectDB();
-if (inMemory) await seed(); // zero-setup demo: fresh DB gets demo data every start
+if (inMemory && !(await User.exists({}))) await seed(); // zero-setup demo: an empty local DB gets demo data
 
 const port = process.env.PORT || 4000;
 server.listen(port, () => console.log(`Pulse API on http://localhost:${port}`));

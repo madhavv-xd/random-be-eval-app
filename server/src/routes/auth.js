@@ -18,6 +18,9 @@ router.post('/auth/register', async (req, res) => {
   if (!EMAIL.test(email)) throw httpError(400, 'Please enter a valid email');
   if (password.length < 6) throw httpError(400, 'Password must be at least 6 characters');
 
+  const taken = await User.findOne({ $or: [{ username }, { email }] }, 'username').lean();
+  if (taken) throw httpError(409, taken.username === username ? 'That username is already taken' : 'That email is already registered');
+
   const user = await User.create({ name, username, email, passwordHash: await bcrypt.hash(password, 10) });
   res.status(201).json({ token: signToken(user.id), user });
 });

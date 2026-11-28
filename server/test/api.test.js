@@ -8,12 +8,14 @@ import { Post } from '../src/models.js';
 import { parseMentions, parseTags } from '../src/lib.js';
 import { clearCache, redis } from '../src/cache.js';
 import { closeSocket } from '../src/socket.js';
+import { ensureIndexes } from '../src/db.js';
 
 let mongo, base;
 
 before(async () => {
   mongo = await MongoMemoryServer.create();
   await mongoose.connect(mongo.getUri());
+  await ensureIndexes();
   await new Promise((resolve) => server.listen(0, resolve));
   base = `http://localhost:${server.address().port}/api`;
 });

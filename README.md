@@ -39,15 +39,17 @@ Open **http://localhost:5173** and click **Try the demo account**.
 | `leo`, `aria`, `kai`, `zoe` | `password123` | Regular accounts with posts, stories and comments |
 | `sam` | `password123` | **Private** account with a pending follow request from `leo` |
 
-**How the database works.** With no `MONGO_URI` set, the API starts an in-memory MongoDB (`mongodb-memory-server`) and re-seeds it on every start. The first run downloads a MongoDB binary (about 600 MB, cached afterwards). Data resets whenever the server restarts.
+**How the database works.** With no `MONGO_URI` set, the API starts a local MongoDB (`mongodb-memory-server`) whose files live in `server/.data`, and seeds demo data only when it is empty. Your posts and accounts survive restarts; delete `server/.data` to start over with fresh demo data. The first run downloads a MongoDB binary (about 600 MB, cached afterwards).
 
-To use a real database instead:
+To use a real database instead (a local MongoDB on `127.0.0.1:27017`, or Atlas):
 
 ```bash
-cp server/.env.example server/.env   # set MONGO_URI and JWT_SECRET (REDIS_URL, CLOUDINARY_URL, SENTRY_DSN are optional)
-npm run seed                          # wipes and reseeds that database
+cp server/.env.example server/.env   # defaults to mongodb://127.0.0.1:27017/pulse; swap in an Atlas URI for production
+npm run seed                          # wipes and reseeds only the pulse database
 npm run dev
 ```
+
+`server/.env.example` documents every variable; REDIS_URL, CLOUDINARY_URL and SENTRY_DSN are optional and fall back to local implementations.
 
 The demo photos and videos are loaded from public URLs (see [credits](#media-credits)), so the demo needs an internet connection.
 
@@ -102,7 +104,7 @@ pulse/
 │  ├─ src/
 │  │  ├─ index.js            connect DB → seed (in-memory mode) → listen
 │  │  ├─ app.js              Express app: middleware order and route mounting
-│  │  ├─ db.js               MONGO_URI or in-memory MongoDB
+│  │  ├─ db.js               MONGO_URI or local MongoDB in server/.data
 │  │  ├─ models.js           all Mongoose schemas and indexes
 │  │  ├─ access.js           every privacy + blocking rule in one place
 │  │  ├─ instrument.js       Sentry (imported first; no-op without SENTRY_DSN)
